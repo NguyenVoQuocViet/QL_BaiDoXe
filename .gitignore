@@ -1,0 +1,25 @@
+## Visual Studio Temp & Build Files
+[Bb]in/
+[Oo]bj/
+.vs/
+TestResults/
+
+## User-specific files
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+## SQL Server files (Nếu bạn để file DB trong thư mục dự án)
+*.mdf
+*.ldf
+*.ndf
+
+## Backup & Log files
+*.bak
+*.log
+*.tmp
+
+## OS generated files
+Thumbs.db
+desktop.ini
