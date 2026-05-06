@@ -582,3 +582,113 @@ INSERT INTO LichSuViTriDo (MaViTri, MaThe, ThoiGianBatDau, ThoiGianKetThuc) VALU
 ('V013', 'UID025', '2026-05-04 17:00:00', NULL);
 
 -- Cau hoi truy van
+
+-- a. Truy van don gian
+
+    -- a.1. Hien thi bien soxe, so the cac xe da lam the thang
+    select BienSo, SoThe from TheXe join Xe on TheXe.MaXe = Xe.MaXe where LoaiThe = N'Thẻ tháng'
+
+    -- a.2. Liet ke nhung khu vuc co suc chua <100
+    select * from KhuVuc where SucChuaToiDa <100
+
+    -- a.3. Cho biet ma nhan vien, ho ten, ngay sinh, dia chi nhung nhan vien o bai do xe
+    select MaNhanVien, HoTen, NgaySinh, DiaChi from NhanVien where MaVaiTro = 'NV'
+
+    -- a.4. Cho biet nhan vien lam ca sang
+    select MaNhanVien, HoTen, SoDienThoai from NhanVien where CaLamViec = N'Sáng'
+
+    -- a.5. Liet ke cac luot gui xe chua ra (con trong bai) trong thang 5/2026
+    select * from LuotGuiXe
+    where TrangThaiLuotGui = N'Trong bãi'
+    and ThoiGianVao >= '2026-05-01' and ThoiGianVao < '2026-06-01'
+
+-- d. Truy van lon nhat, nho nhat
+
+    -- d.1. Nhan vien co luong thap nhat
+    select top 1 MaNhanVien, HoTen, Luong from NhanVien order by Luong asc
+
+    -- d.2. Nhan vien co luot xu li xe di vao it nhat
+    select top 1 MaNVVao, count(MaNVVao) as LuotXuLy from LuotGuiXe group by MaNVVao order by count(MaNVVao) asc
+
+    -- d.3. Su co co chi phi xu li cao nhat
+    select sc.MaSuCo, sc.NoiDung, sc.ChiPhi, sc.TrangThai
+    from SuCoBaiXe sc
+    where sc.ChiPhi = (select max(ChiPhi) from SuCoBaiXe)
+
+    -- d.4. Khu vuc co nhieu vi tri dang su dung nhat
+    select top 1 kv.MaKhu, count(kv.MaKhu) as LuotSuDung
+    from LuotGuiXe lgx
+    join ViTriDo vtd on lgx.MaViTri = vtd.MaViTri
+    join KhuVuc kv on vtd.MaKhu = kv.MaKhu
+    where TrangThaiLuotGui = N'Trong bãi'
+    group by kv.MaKhu
+    order by count(kv.MaKhu) desc
+
+-- f. Truy van hop/giao/tru
+
+-- Truy van hop
+
+    -- Danh sach tat ca moi nguoi co trong he thong
+    select HoTen, SoDienThoai, N'Nhân viên' as PhanLoai from NhanVien
+    union
+    select HoTen, SoDienThoai, N'Cư dân' as PhanLoai from CuDan
+
+-- g. Truy van update/delete
+
+-- Truy van update
+
+    -- Tang luong them 10% cho nhan vien lam ca toi (note: da thuc hien lenh update)
+
+        -- Xem ket qua truoc khi thuc hien (so sanh luong cu va luong moi)
+        select MaNhanVien, HoTen, CaLamViec, Luong, Luong * 1.1 as LuongMoi
+        from NhanVien
+        where CaLamViec = N'Tối'
+
+        -- Thuc hien cap nhat
+        update NhanVien
+        set Luong = Luong * 1.1
+        where CaLamViec = N'Tối'
+
+        -- Xem ket qua sau khi thuc hien
+        select MaNhanVien, HoTen, CaLamViec, Luong
+        from NhanVien
+        where CaLamViec = N'Tối'
+
+
+-- Truy van delete
+
+    -- Xoa lich su do cac xe truoc ngay 4/5/2026 
+
+        -- Xem truoc cac dong se bi xoa
+        select *
+        from LichSuViTriDo
+        where ThoiGianKetThuc < '2026-05-04'
+
+        -- Thuc hien xoa 
+        begin transaction
+            delete from LichSuViTriDo
+            where ThoiGianKetThuc IS NOT NULL
+            and ThoiGianKetThuc < '2026-05-04'
+
+            -- Kiem tra sau khi xoa
+            select * from LichSuViTriDo
+        rollback -- Neu chua dung co the quay lai
+        
+
+-- h. Truy van su dung phep chia
+
+-- Nhung nhan vien da xu li luot vao cua tat ca loai the
+select nv.MaNhanVien, nv.HoTen
+from NhanVien nv
+where not exists(
+    -- Lay tat ca the ton tai trong he thong
+    select distinct tx1.LoaiThe from TheXe tx1
+    where not exists (
+        -- Kiem tra xem nhan vien da xu li loai the nay chua
+        select 1
+        from LuotGuiXe lg
+        join TheXe tx2 on lg.MaThe = tx2.MaThe
+        where lg.MaNVVao = nv.MaNhanVien
+          and tx2.LoaiThe = tx1.LoaiThe
+    )
+)
