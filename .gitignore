@@ -23,3 +23,6 @@ TestResults/
 ## OS generated files
 Thumbs.db
 desktop.ini
+
+## Word
+*.docx

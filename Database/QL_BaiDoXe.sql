@@ -583,7 +583,7 @@ INSERT INTO LichSuViTriDo (MaViTri, MaThe, ThoiGianBatDau, ThoiGianKetThuc) VALU
 
 -- Cau hoi truy van
 
--- a. Truy van don gian
+-- a. Truy van don gian (5 cau)
 
     -- a.1. Hien thi bien soxe, so the cac xe da lam the thang
     select BienSo, SoThe from TheXe join Xe on TheXe.MaXe = Xe.MaXe where LoaiThe = N'Thẻ tháng'
@@ -602,7 +602,54 @@ INSERT INTO LichSuViTriDo (MaViTri, MaThe, ThoiGianBatDau, ThoiGianKetThuc) VALU
     where TrangThaiLuotGui = N'Trong bãi'
     and ThoiGianVao >= '2026-05-01' and ThoiGianVao < '2026-06-01'
 
--- d. Truy van lon nhat, nho nhat
+-- c. Truy van voi menh de having (5 cau)
+    -- c.1. Liet ke nhung nhan vien da thu tong so tien thanh toan lon hon 500000 VND
+    SELECT NV.MaNhanVien, NV.HoTen, SUM(TT.SoTien) AS TongSoTienThanhToan
+    FROM NhanVien NV JOIN ThanhToan TT ON NV.MaNhanVien = TT.MaNhanVien
+    GROUP BY NV.MaNhanVien, NV.HoTen
+    HAVING SUM(TT.SoTien) > 500000;
+
+    -- c.2. Tim cac khu vuc dang co so luong vi tri do bi chiem dung tu 2 cho tro len
+    SELECT KV.MaKhu, KV.TenKhu, COUNT(V.MaViTri) AS SoChoDaDung
+    FROM KhuVuc KV JOIN ViTriDo V ON KV.MaKhu = V.MaKhu
+    WHERE (V.TrangThai) = 1
+    GROUP BY KV.MaKhu, KV.TenKhu
+    HAVING COUNT(V.MaViTri) >= 2;
+
+    -- c.3. Liet ke cac khu vuc co tu 2 su co tro len ma tong chi phi xu ly su co tai khu vuc do
+    -- vuot qua 100000 VND
+    SELECT KV.MaKhu, KV.TenKhu, COUNT(S.MaSuCo) AS SoVuSuCo, SUM(S.ChiPhi) AS TongChiPhiSuCo
+    FROM KhuVuc KV 
+        JOIN ViTriDo V ON KV.MaKhu = V.MaKhu
+        JOIN LuotGuiXe L ON L.MaViTri = V.MaViTri
+        JOIN SuCoBaiXe S ON S.MaLuotGui = L.MaLuotGui
+    GROUP BY KV.MaKhu, KV.TenKhu
+    HAVING COUNT(S.MaSuCo) >= 2 AND SUM(S.ChiPhi) > 100000;
+
+    -- c.4. Tim cac toa nha co tong tien thanh toan the thang vuot qua 1500000 VND
+    SELECT CH.ToaNha, COUNT(DISTINCT CD.MaCuDan) AS SoLuongCuDan,SUM(TT.SoTien) AS TongDoanhThuThang
+    FROM CanHo CH
+        JOIN CuDan_CanHo CDCH ON CH.MaCanHo = CDCH.MaCanHo
+        JOIN CuDan CD ON CDCH.MaCuDan = CD.MaCuDan
+        JOIN Xe X ON CD.MaCuDan = X.MaCuDan
+        JOIN TheXe TX ON X.MaXe = TX.MaXe
+        JOIN ThanhToanThang TTT ON TX.MaThe = TTT.MaThe
+        JOIN ThanhToan TT ON TTT.MaThanhToan = TT.MaThanhToan
+    GROUP BY CH.ToaNha
+    HAVING SUM(TT.SoTien) > 1500000;
+
+    -- c.5. Tim nhung The ngay (khach vang lai) da vao bai it nhat 1 lan va co tong so tien thanh toan
+    -- ngay cao hon 10000 VND
+    SELECT TX.MaThe, TX.SoThe, COUNT(LG.MaLuotGui) AS SoLuotVao, SUM(TT.SoTien) AS TongTienVangLai
+    FROM TheXe TX
+        JOIN LuotGuiXe LG ON TX.MaThe = LG.MaThe
+        JOIN ThanhToanNgay TTN ON LG.MaLuotGui = TTN.MaLuotGui
+        JOIN ThanhToan TT ON TTN.MaThanhToan = TT.MaThanhToan
+    WHERE TX.LoaiThe = N'Thẻ ngày'
+    GROUP BY TX.MaThe, TX.SoThe
+    HAVING COUNT(LG.MaLuotGui) >= 1 AND SUM(TT.SoTien) > 10000;
+    
+-- d. Truy van lon nhat, nho nhat (4 cau)
 
     -- d.1. Nhan vien co luong thap nhat
     select top 1 MaNhanVien, HoTen, Luong from NhanVien order by Luong asc
@@ -624,7 +671,43 @@ INSERT INTO LichSuViTriDo (MaViTri, MaThe, ThoiGianBatDau, ThoiGianKetThuc) VALU
     group by kv.MaKhu
     order by count(kv.MaKhu) desc
 
--- f. Truy van hop/giao/tru
+-- e. Truy van Khong/chua co (Not In va Left/Right Join) (5 cau)
+    -- e.1. Tim nhung can ho dang trong
+    SELECT CH.MaCanHo, CH.SoCanHo, CH.ToaNha, CH.Tang
+    FROM CanHo CH
+    LEFT JOIN CuDan_CanHo CDCH ON CH.MaCanHo = CDCH.MaCanHo
+    WHERE CDCH.MaCuDan IS NULL;
+
+    -- e.2. Tim nhung nhan vien chua tung thuc hien quet the cho xe ra
+    SELECT NV.MaNhanVien, NV.HoTen
+    FROM NhanVien NV LEFT JOIN LuotGuiXe L ON NV.MaNhanVien = L.MaNVRa
+    WHERE L.MaLuotGui IS NULL AND NV.MaVaiTro = 'NV';
+
+    -- e.3. Tim nhung khu vuc hien khong co bat ky xe nao dang do
+    SELECT K.MaKhu, K.TenKhu
+    FROM KhuVuc K LEFT JOIN ViTriDo V ON K.MaKhu = V.MaKhu AND V.TrangThai = 1
+    WHERE V.MaViTri IS NULL;
+
+    -- e.4. Tim nhung cu dan chua tung gap su co mat mu bao hiem
+    SELECT MaCuDan, HoTen
+    FROM CuDan
+    WHERE MaCuDan NOT IN (
+        SELECT DISTINCT X.MaCuDan
+        FROM Xe X
+            JOIN TheXe TX ON X.MaXe = TX.MaXe
+            JOIN LuotGuiXe LG ON TX.MaThe = LG.MaThe
+            JOIN SuCoBaiXe SC ON LG.MaLuotGui = SC.MaLuotGui
+        WHERE SC.NoiDung LIKE N'%Mất mũ bảo hiểm%'
+    );
+    
+    -- e.5. Tim nhan vien chua tung thuc hien thu tien
+    SELECT MaNhanVien, HoTen, CaLamViec
+    FROM NhanVien
+    WHERE MaNhanVien NOT IN (
+        SELECT DISTINCT MaNhanVien FROM ThanhToan
+    );
+
+-- f. Truy van hop/giao/tru (3 cau)
 
 -- Truy van hop
 
@@ -632,6 +715,21 @@ INSERT INTO LichSuViTriDo (MaViTri, MaThe, ThoiGianBatDau, ThoiGianKetThuc) VALU
     select HoTen, SoDienThoai, N'Nhân viên' as PhanLoai from NhanVien
     union
     select HoTen, SoDienThoai, N'Cư dân' as PhanLoai from CuDan
+
+-- Truy van tru
+    
+    -- Tim nhung cu dan da dang ky the thang xe may nhung chua tung thuc hien thanh toan
+    SELECT CD.MaCuDan, CD.HoTen, X.BienSo
+    FROM CuDan CD
+    JOIN Xe X ON CD.MaCuDan = X.MaCuDan
+    JOIN LoaiXe LX ON X.MaLoaiXe = LX.MaLoaiXe
+    WHERE LX.TenLoaiXe = N'Xe máy'
+    EXCEPT
+    SELECT CD.MaCuDan, CD.HoTen, X.BienSo
+    FROM CuDan CD
+    JOIN Xe X ON CD.MaCuDan = X.MaCuDan
+    JOIN TheXe TX ON X.MaXe = TX.MaXe
+    JOIN ThanhToanThang TTT ON TX.MaThe = TTT.MaThe
 
 -- g. Truy van update/delete
 
@@ -654,6 +752,22 @@ INSERT INTO LichSuViTriDo (MaViTri, MaThe, ThoiGianBatDau, ThoiGianKetThuc) VALU
         from NhanVien
         where CaLamViec = N'Tối'
 
+    -- Cap nhat lai chi phi xu ly co dinh la 50000 VND cho cac su co lien quan den 'The' hoac 'Chia khoa'
+        -- Xem ket qua truoc khi thuc hien
+        SELECT MaSuCo, NoiDung, ChiPhi
+        FROM SuCoBaiXe
+        WHERE NoiDung LIKE N'%Thẻ%' OR NoiDung LIKE N'%Chìa khóa%';
+
+        -- Thuc hien cap nhat
+        UPDATE SuCoBaiXe
+        SET ChiPhi = CASE WHEN NoiDung LIKE N'%Thẻ%' OR NoiDung LIKE N'%chìa khóa%' THEN 50000 
+                ELSE ChiPhi 
+            END;
+
+        -- Xem ket qua sau khi thuc hien
+        SELECT MaSuCo, NoiDung, ChiPhi
+        FROM SuCoBaiXe
+        WHERE NoiDung LIKE N'%Thẻ%' OR NoiDung LIKE N'%Chìa khóa%';
 
 -- Truy van delete
 
@@ -674,21 +788,60 @@ INSERT INTO LichSuViTriDo (MaViTri, MaThe, ThoiGianBatDau, ThoiGianKetThuc) VALU
             select * from LichSuViTriDo
         rollback -- Neu chua dung co the quay lai
         
+    -- Xoa du lieu trong bang lich su the xe da qua 6 thang cua nhung the van dang hoat dong
+        -- Xem truoc cac dong se bi xoa
+        SELECT * FROM LichSuTheXe
+        WHERE NgayCapNhat < DATEADD(MONTH, -6, GETDATE());
+
+        -- Thuc hien xoa
+        DELETE FROM LichSuTheXe
+        WHERE NgayCapNhat < DATEADD(month, -6, GETDATE()) AND MaThe IN 
+            (SELECT MaThe FROM TheXe WHERE TrangThai = N'Đang hoạt động');
 
 -- h. Truy van su dung phep chia
 
--- Nhung nhan vien da xu li luot vao cua tat ca loai the
-select nv.MaNhanVien, nv.HoTen
-from NhanVien nv
-where not exists(
-    -- Lay tat ca the ton tai trong he thong
-    select distinct tx1.LoaiThe from TheXe tx1
-    where not exists (
-        -- Kiem tra xem nhan vien da xu li loai the nay chua
-        select 1
-        from LuotGuiXe lg
-        join TheXe tx2 on lg.MaThe = tx2.MaThe
-        where lg.MaNVVao = nv.MaNhanVien
-          and tx2.LoaiThe = tx1.LoaiThe
+    -- h.1. Nhung nhan vien da xu li luot vao cua tat ca loai the
+    select nv.MaNhanVien, nv.HoTen
+    from NhanVien nv
+    where not exists(
+        -- Lay tat ca the ton tai trong he thong
+        select distinct tx1.LoaiThe from TheXe tx1
+        where not exists (
+            -- Kiem tra xem nhan vien da xu li loai the nay chua
+            select *
+            from LuotGuiXe lg
+            join TheXe tx2 on lg.MaThe = tx2.MaThe
+            where lg.MaNVVao = nv.MaNhanVien
+              and tx2.LoaiThe = tx1.LoaiThe
+        )
     )
-)
+
+    -- h.2. Tim hang xe co tat ca loai xe (o to va xe may) trong bai gui xe
+    SELECT DISTINCT X1.HangXe
+    FROM Xe X1
+    WHERE NOT EXISTS (
+        -- Lấy tất cả các loại xe định nghĩa trong hệ thống (XM, OT)
+        SELECT LX.MaLoaiXe 
+        FROM LoaiXe LX
+        WHERE NOT EXISTS (
+            -- Kiểm tra xem hãng xe này có sản xuất loại xe đó không?
+            SELECT * 
+            FROM Xe X2 
+            WHERE X2.HangXe = X1.HangXe 
+              AND X2.MaLoaiXe = LX.MaLoaiXe
+        )
+    );
+
+    -- h.3. Tim cu dan thue tat ca can ho o tang 9
+    SELECT CD.MaCuDan, CD.HoTen, CD.SoDienThoai
+    FROM CuDan CD
+    WHERE EXISTS (SELECT 1 FROM CuDan_CanHo WHERE MaCuDan = CD.MaCuDan)
+    AND NOT EXISTS (
+        SELECT CH.MaCanHo 
+        FROM CanHo CH 
+        WHERE CH.Tang = 9 AND NOT EXISTS (
+            SELECT * 
+            FROM CuDan_CanHo CDCH
+            WHERE CDCH.MaCuDan = CD.MaCuDan AND CDCH.MaCanHo = CH.MaCanHo
+        )
+    );
