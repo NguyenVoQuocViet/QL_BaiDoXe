@@ -581,11 +581,11 @@ INSERT INTO LichSuViTriDo (MaViTri, MaThe, ThoiGianBatDau, ThoiGianKetThuc) VALU
 ('V012', 'UID015', '2026-05-04 16:00:00', NULL),
 ('V013', 'UID025', '2026-05-04 17:00:00', NULL);
 
--- Cau hoi truy van
+--3. Cau hoi truy van
 
 -- a. Truy van don gian (5 cau)
 
-    -- a.1. Hien thi bien soxe, so the cac xe da lam the thang
+    -- a.1. Hien thi bien so xe, so the cac xe da lam the thang
     select BienSo, SoThe from TheXe join Xe on TheXe.MaXe = Xe.MaXe where LoaiThe = N'Thẻ tháng'
 
     -- a.2. Liet ke nhung khu vuc co suc chua <100
@@ -845,3 +845,184 @@ INSERT INTO LichSuViTriDo (MaViTri, MaThe, ThoiGianBatDau, ThoiGianKetThuc) VALU
             WHERE CDCH.MaCuDan = CD.MaCuDan AND CDCH.MaCanHo = CH.MaCanHo
         )
     );
+
+--4. Thu tuc, ham, trigger
+
+--Thu tuc
+
+    --Xem lich su gui xe theo bien so
+    if object_id('sp_LichSuGui', 'p') is not null 
+        drop procedure sp_LichSuGui
+    go
+    create procedure sp_LichSuGui
+        @BienSo varchar(20)
+    as begin
+        select
+            lgx.MaLuotGui,
+            x.BienSo,
+            x.HangXe,
+            x.TenDongXe,
+            tx.LoaiThe,
+            lgx.ThoiGianVao,
+            lgx.ThoiGianRa,
+            lgx.TrangThaiLuotGui,
+            lgx.TongTien
+        from LuotGuiXe lgx
+        join TheXe tx on lgx.MaThe = tx.MaThe
+        join Xe x on tx.MaXe = x.MaXe
+        where x.BienSo = @BienSo
+        order by lgx.ThoiGianVao desc
+    end
+    go
+
+    --Vi du
+    exec sp_LichSuGui '79-H1 12345'
+
+    --Thong ke doanh thu theo khoang thoi gian
+    if object_id('sp_DoanhThu', 'p') is not null
+        drop procedure sp_DoanhThu
+    go
+    create procedure sp_DoanhThu 
+        @TuNgay date,
+        @DenNgay date
+    as begin
+        select 
+            count(*) as TongLuotGui,
+            sum(TongTien) as TongDoanhThu,
+            count(case when PhuongThucTinhPhi = N'Thẻ ngày' then 1 end) as LuotTheNgay,
+            count(case when PhuongThucTinhPhi = N'Thẻ tháng' then 1 end) as LuotTheThang,
+            sum(case when PhuongThucTinhPhi = N'Thẻ ngày' then TongTien else 0 end) as DoanhThuTheNgay
+        from LuotGuiXe 
+        where cast(ThoiGianVao as date) between @TuNgay and @DenNgay
+            and TrangThaiLuotGui = N'Đã ra'
+       end
+    go
+    
+    --Vi du
+    exec sp_DoanhThu '2026-05-01', '2026-05-10'
+
+    --Bao cao su co theo khu vuc
+    if object_id('sp_BaoCaoSuCo', 'p') is not null
+        drop procedure sp_BaoCaoSuCo 
+    go
+    create procedure sp_BaoCaoSuCo
+        @TrangThai nvarchar(50) = null
+    as begin
+        select 
+            kv.TenKhu,
+            count(sc.MaSuCo) as TongSuCo,
+            sum(sc.ChiPhi) as TongChiPhi,
+            count(case when sc.TrangThai = N'Đang chờ xử lý' then 1 end) as ChuaXuLy,
+            count(case when sc.TrangThai = N'Xử lý xong' then 1 end) as DaXuLy
+        from SuCoBaiXe sc
+        join LuotGuiXe lgx on sc.MaLuotGui = lgx.MaLuotGui
+        join ViTriDo vtd on lgx.MaViTri = vtd.MaViTri
+        join KhuVuc kv on vtd.MaKhu = kv.MaKhu
+        where @TrangThai is null or sc.TrangThai = @TrangThai
+        group by kv.MaKhu, kv.TenKhu
+        order by TongChiPhi desc
+    end
+    go
+
+    --Vi du
+    exec sp_BaoCaoSuCo N'Đang chờ xử lý'
+
+--Ham
+
+    --Dem so xe dang trong bai theo khu vuc
+    if object_id('fn_DemXe', 'fn') is not null
+        drop function fn_DemXe
+    go
+    create function fn_DemXe(@Makhu varchar(5))
+    returns int
+    as begin
+        declare @SoXe int
+        select @SoXe = count(*)
+        from LuotGuiXe lgx
+        join ViTriDo vtd on lgx.MaViTri = vtd.MaViTri
+        where vtd.MaKhu = @Makhu and lgx.TrangThaiLuotGui = N'Trong bãi'
+        return @SoXe
+    end
+    go
+
+    --Vi du
+    select dbo.fn_DemXe('K01') as SoXeHienTai
+
+    --Tinh tien gui xe theo gio va loai xe
+    if object_id('fn_TinhTien', 'fn') is not null
+        drop function fn_TinhTien
+    go
+    create function fn_TinhTien(@ThoiGianVao datetime, @ThoiGianRa datetime, @MaLoaiXe varchar(10))
+    returns decimal(18,2)
+    as begin
+        declare @GiaNgay decimal(18,2)
+        declare @SoGio int
+        select @GiaNgay = GiaTienNgay
+        from LoaiXe 
+        where MaLoaiXe = @MaLoaiXe
+        set @SoGio = datediff(hour, @ThoiGianVao, @ThoiGianRa)
+        if @SoGio < 1 set @SoGio = 1
+        return @SoGio * (@GiaNgay / 8.0)
+    end
+    go
+
+    --Vidu
+    select dbo.fn_TinhTien('2026-05-01 07:00', '2026-05-01 11:00', 'XM') as TienGui
+
+    --Thoi gian do trung binh tai mot khu vuc(thoi gian: phut)
+    if object_id('fn_ThoiGianDoTrungBinh', 'fn') is not null
+        drop function fn_ThoiGianDoTrungBinh 
+    go
+    create function fn_ThoiGianDoTrungBinh(@MaKhu varchar(5))
+    returns int
+    as
+    begin
+        declare @TrungBinh int
+        select @TrungBinh = avg(datediff(minute, lgx.ThoiGianVao, lgx.ThoiGianRa))
+        from LuotGuiXe lgx
+        join ViTriDo vtd on lgx.MaViTri = vtd.MaViTri
+        where vtd.MaKhu = @MaKhu
+          and lgx.ThoiGianRa is not null
+
+        return isnull(@TrungBinh, 0)
+    end
+    go
+
+    --Vi du
+    select dbo.fn_ThoiGianDoTrungBinh('K01') as ThoiGianTrungBinh
+
+
+--Trigger
+
+    --Khi xe vao: tu dong danh dau vi tri ban cua vi tri do xe va ghi lich su
+    if object_id('trg_GhiNhanXeVao', 'trg') is not null
+        drop trigger trg_GhiNhanXeVao
+    go
+    create trigger trg_GhiNhanXeVao
+    on LuotGuiXe
+    after insert
+    as begin
+        --Danh dau vi tri do da co xe (TrangThai = 1)
+        update vtd
+        set vtd.TrangThai = 1
+        from ViTriDo vtd
+        join inserted i on vtd.MaViTri = i.MaViTri
+
+        --Tu dong ghi vao lich su vi tri do
+        insert into LichSuViTriDo(MaViTri, MaThe, ThoiGianBatDau)
+        select i.MaViTri, i.MaThe, i.ThoiGianVao
+        from inserted i
+    end
+    go
+
+    --Vi du
+    insert into LuotGuiXe(MaLuotGui, MaThe, MaViTri, ThoiGianVao, MaNVVao, PhuongThucTinhPhi, TrangThaiLuotGui, TongTien)
+    values ('L026', 'UID016', 'V003', GETDATE(), 'NV002', N'Thẻ ngày', N'Trong bãi', 0)
+
+    select MaViTri, TrangThai
+    from ViTriDo 
+    where MaViTri = 'V003'
+
+    select * 
+    from LichSuViTriDo 
+    where MaViTri = 'V003'
