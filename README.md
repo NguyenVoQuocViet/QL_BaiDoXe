@@ -28,7 +28,7 @@
 - **Parameterized queries** for SQL injection prevention
 - **Vietnamese language support** (Unicode/NVARCHAR)
 
-### 3. User Interfaces
+### 3. Giao diện người dùng
 
 #### Admin Dashboard (10 Tabs)
 ```
@@ -44,7 +44,7 @@
 10. Thống kê (Statistics) - Revenue & Charts
 ```
 
-#### Staff Dashboard (5 Tabs)
+#### Tổng quan cho nhân viên (5 Tabs)
 ```
 1. Xe - Manage vehicles
 2. Thẻ Xe - Manage cards
@@ -53,18 +53,18 @@
 5. Truy vấn - Search
 ```
 
-#### Resident Dashboard (1 Tab)
+#### Tổng quan cho cư dân (1 Tab)
 ```
 1. Thông tin của tôi - View personal vehicles & history (Read-only)
 ```
 
-### 4. Statistics & Reports
+### 4. Truy vấn và thống kê
 - 📊 Monthly revenue breakdown
 - 🥧 Vehicle type distribution
 - 📈 Parking occupancy rates
 - 💹 Daily/Total revenue summaries
 
-### 5. Technical Features
+### 5. Công nghệ
 - MaterialSkin 2.3.1 for modern UI
 - LiveCharts integration for visualizations
 - ADO.NET with parameterized queries
